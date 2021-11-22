@@ -21,6 +21,7 @@ function Machine.new(id, label, sequence_length, running, active)
     s.previous = nil
     -- Link to next machine in machines list
     s.next = nil
+    s.clock_count = 1
 
     s.dials = {
         steps=ui.Dial.new(55, 28, 22, 8, 1, s.sequence_length, 1, 1, {s.sequence_length * 0.5}),
@@ -30,12 +31,13 @@ function Machine.new(id, label, sequence_length, running, active)
     return s
 end
 
-function Machine:add_params(sequence_controlspec, knob_controlspec, default_value_controlspec)
+function Machine:add_params(sequence_controlspec, knob_controlspec, default_value_controlspec, clock_div_controlspec)
     params:add{type="trigger", id=self.id.."_active", name="Active", action=function() self:toggle_active() end}
     params:add_control(self.id.."_steps", "Steps", sequence_controlspec)
     params:add_control(self.id.."_knob", "Knob", knob_controlspec)
     params:add{type="trigger", id=self.id.."_running", name="Running", action=function() self:toggle_running() end}
     params:add_control(self.id..'_default', "Default", default_value_controlspec)
+    params:add_control(self.id..'_clock_div', "Clock div", clock_div_controlspec)
 
     self.dials.steps:set_value(sequence_controlspec.default)
     self.dials.knob:set_value(get_linexp_value(knob_controlspec.default))
@@ -93,7 +95,12 @@ function Machine:update_sequence_and_get_value()
     self:mutate_sequence()
     local current_value = self.sequence[self.position]
     if self.running then
-        self:move_to_next_position()
+        if self.clock_count >= params:get(self.id..'_clock_div') then
+            self:move_to_next_position()
+            self.clock_count = 1
+        else
+            self.clock_count = self.clock_count + 1
+        end
     end
     return current_value
 end
