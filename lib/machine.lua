@@ -3,17 +3,23 @@ ui = require 'ui'
 local Machine = {}
 Machine.__index = Machine
 
-function Machine.new(id, label, sequence_length, running)
+function Machine.new(id, label, sequence_length, running, active)
     local s = setmetatable({}, Machine)
     s.id = id or 'machine'
     s.label = label or id or 'Machine'
 
+    -- Length of the sequence
     s.sequence_length = sequence_length or 16
     s:init_sequence()
+    -- Current step position in sequence array
     s.position = 1
+    -- Whether this machine is running or froze on current step
     s.running = running or true
-    s.active = true
+    -- Whether this machine is active or its default value is used
+    s.active = active or true
+    -- Link to previous machine in machines list
     s.previous = nil
+    -- Link to next machine in machines list
     s.next = nil
 
     s.dials = {
@@ -24,9 +30,12 @@ function Machine.new(id, label, sequence_length, running)
     return s
 end
 
-function Machine:add_params(sequence_controlspec, knob_controlspec)
+function Machine:add_params(sequence_controlspec, knob_controlspec, default_value_controlspec)
+    params:add{type="trigger", id=self.id.."_active", name="Active", action=function() self:toggle_active() end}
     params:add_control(self.id.."_steps", "Steps", sequence_controlspec)
     params:add_control(self.id.."_knob", "Knob", knob_controlspec)
+    params:add{type="trigger", id=self.id.."_running", name="Running", action=function() self:toggle_running() end}
+    params:add_control(self.id..'_default', "Default", default_value_controlspec)
 
     self.dials.steps:set_value(sequence_controlspec.default)
     self.dials.knob:set_value(get_linexp_value(knob_controlspec.default))
@@ -56,8 +65,17 @@ function Machine:set_knob_delta(delta)
     self.dials.knob:set_marker_position(1, new_value)
 end
 
+function Machine:get_default()
+    return params:get(self.id..'_default')
+end
+
 function Machine:toggle_running()
     self.running = not self.running
+end
+
+function Machine:toggle_active()
+    self.active = not self.active
+    self:set_dials_active(self.active)
 end
 
 function Machine:init_sequence()
@@ -112,9 +130,11 @@ end
 function Machine:draw_sequence(x, y, scale)
     local index = self.position
     local steps = self:get_steps()
+    local max_level = 15
+    if not self.active then max_level = 7 end
     for i=0,math.min(steps - 1, 7) do
         index = util.wrap(self.position + i, 1, steps)
-        screen.level(math.floor(self.sequence[index] * 15 + 1))
+        screen.level(math.floor(self.sequence[index] * max_level + 1))
         screen.rect(x + i * 8, y - scale, scale, scale)
         screen.fill()
     end

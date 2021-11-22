@@ -4,10 +4,20 @@
 -- affecting different parameters
 --
 
--- TODO Use note length instead of seconds for duration (e.g. 1, 1/2, 1/4, ...) (be careful about rounding when getting the value in play_next_note method)
--- TODO Add midi and output control (similar to awake)
-
--- TODO Add synth params control
+-- TODO
+--
+-- Add filter cutoff machine
+--
+-- Maybe param for clock division for each turing machine
+--
+-- Add midi and output control (similar to awake)
+--
+-- Add synth params control
+--
+-- Refactor: Add name of extra two params (ones displayed on pages) to machines so the control... and draw...
+-- methods can be implemented there and simplify this file
+--
+-- Refactor: Rename duration to env or release
 
 mu = require "musicutil"
 ui = require 'ui'
@@ -78,11 +88,11 @@ function set_params()
 
     -- Notes
     local machine = machines['notes']
-    params:add_group(machine.label, 5)
-    machine:add_params(cs_SEQL, cs_KNOB)
-    local cs_NOTE = controlspec.MIDINOTE:copy();
+    params:add_group(machine.label, 8)
+    local cs_NOTE = controlspec.MIDINOTE:copy()
     cs_NOTE.default = 48;
     cs_NOTE.step = 1;
+    machine:add_params(cs_SEQL, cs_KNOB, cs_NOTE)
     params:add{type="control", id="root_note", name="Root", controlspec=cs_NOTE,
     formatter=function(param) return mu.note_num_to_name(param:get(), true) end, action=function(x) build_scale() end}
     params:add{type="number", id="scale", name="Scale", min=1, max=#mu.SCALES, default=1,
@@ -93,27 +103,34 @@ function set_params()
 
     -- Notes
     machine = machines['velocity']
-    params:add_group(machine.label, 4)
-    machine:add_params(cs_SEQL, cs_KNOB)
-    local cs_V = controlspec.MIDIVELOCITY:copy();
+    params:add_group(machine.label, 7)
+    local cs_V = controlspec.MIDIVELOCITY:copy()
+    cs_V.default = 64;
+    machine:add_params(cs_SEQL, cs_KNOB, cs_V)
+    cs_V = controlspec.MIDIVELOCITY:copy()
     cs_V.default = 30;
     params:add_control("velocity_min", "Min", cs_V, fm.round(1))
-    cs_V = controlspec.MIDIVELOCITY:copy();
+    cs_V = controlspec.MIDIVELOCITY:copy()
     cs_V.default = 100;
     params:add_control("velocity_max", "Max", cs_V, fm.round(1))
 
     -- Ratcheting
     machine = machines['ratcheting']
-    params:add_group(machine.label, 4)
-    machine:add_params(cs_SEQL, cs_KNOB)
-    params:add{type="option", id="ratcheting_min", name="Min", options=ratcheting_options, default=1} -- ratcheting_options[1]
-    params:add{type="option", id="ratcheting_max", name="Max", options=ratcheting_options, default=4} -- ratcheting_options[4]
+    params:add_group(machine.label, 7)
+    local cs_RAT = controlspec.new(1,#ratcheting_options,'lin',1,1)
+    machine:add_params(cs_SEQL, cs_KNOB, cs_RAT)
+    cs_RAT = cs_RAT:copy()
+    params:add{type="control", id="ratcheting_min", name="Min", controlspec=cs_RAT, formatter=function(param) return ratcheting_options[param:get()] end}
+    cs_RAT = cs_RAT:copy()
+    cs_RAT.default = 4
+    params:add{type="control", id="ratcheting_max", name="Max", controlspec=cs_RAT, formatter=function(param) return ratcheting_options[param:get()] end}
 
     -- Duration
     machine = machines['duration']
-    params:add_group(machine.label, 4)
-    machine:add_params(cs_SEQL, cs_KNOB)
+    params:add_group(machine.label, 7)
     local cs_DUR = controlspec.new(1,#durations_labels,'lin',1,1)
+    machine:add_params(cs_SEQL, cs_KNOB, cs_DUR)
+    cs_DUR = cs_DUR:copy()
     params:add{type="control", id="duration_min", name="Min", controlspec=cs_DUR, formatter=function(param) return durations_labels[param:get()] end}
     cs_DUR = cs_DUR:copy()
     cs_DUR.default = 3
@@ -121,12 +138,14 @@ function set_params()
 
     -- Probability
     machine = machines['probability']
-    params:add_group(machine.label, 4)
-    machine:add_params(cs_SEQL, cs_KNOB)
-    local cs_PROB = controlspec.AMP
+    params:add_group(machine.label, 7)
+    local cs_PROB = controlspec.AMP:copy()
+    cs_PROB.default = 1
+    machine:add_params(cs_SEQL, cs_KNOB, cs_PROB)
+    cs_PROB = controlspec.AMP:copy()
     cs_PROB.default = 0.75
     params:add_control("probability_min", "Min", cs_PROB)
-    cs_PROB = controlspec.AMP
+    cs_PROB = controlspec.AMP:copy()
     cs_PROB.default = 1
     params:add_control("probability_max", "Max", cs_PROB)
 
@@ -143,8 +162,14 @@ function update()
         clock.sync(1)
         if running then
             local machine = machines['ratcheting']
-            local ratcheting = machine:update_sequence_and_get_value()
-            ratcheting = math.floor(ratcheting * math.abs(params:get("ratcheting_max") - params:get("ratcheting_min")) + math.min(params:get("ratcheting_max"), params:get("ratcheting_min")) + 0.5) -- + 0.5 to round instead of floor
+            local ratcheting_index
+            if machine.active then
+                ratcheting_index = machine:update_sequence_and_get_value()
+                ratcheting_index = math.floor(ratcheting_index * math.abs(params:get("ratcheting_max") - params:get("ratcheting_min")) + math.min(params:get("ratcheting_max"), params:get("ratcheting_min")) + 0.5) -- + 0.5 to round instead of floor
+            else
+                ratcheting_index = machine:get_default()
+            end
+            local ratcheting = ratcheting_options[ratcheting_index]
             play_next_note()
             if ratcheting > 1 then
                 ratcheting_metro:start(clock:get_beat_sec() / ratcheting, ratcheting-1)
@@ -155,27 +180,47 @@ end
 
 function play_next_note()
     local machine = machines['probability']
-    local probability = machine:update_sequence_and_get_value()
-    probability = probability * math.abs(params:get("probability_max") - params:get("probability_min")) + math.min(params:get("probability_max"), params:get("probability_min"))
+    local probability
+    if machine.active then
+        probability = machine:update_sequence_and_get_value()
+        probability = probability * math.abs(params:get("probability_max") - params:get("probability_min")) + math.min(params:get("probability_max"), params:get("probability_min"))
+    else
+        probability = machine:get_default()
+    end
     local should_play = math.random() <= probability
 
     machine = machines['duration']
-    local duration_index = machine:update_sequence_and_get_value()
-    duration_index = math.floor(duration_index * math.abs(params:get("duration_max") - params:get("duration_min")) + math.min(params:get("duration_max"), params:get("duration_min")) + 0.5)
+    local duration_index
+    if machine.active then
+        duration_index = machine:update_sequence_and_get_value()
+        duration_index = math.floor(duration_index * math.abs(params:get("duration_max") - params:get("duration_min")) + math.min(params:get("duration_max"), params:get("duration_min")) + 0.5)
+    else
+        duration_index = machine:get_default()
+    end
     local duration = durations_values[duration_index]
     if should_play then engine.release(clock:get_beat_sec() * duration) end
 
     machine = machines['velocity']
-    local next = machine:update_sequence_and_get_value()
-    next = next * math.abs(params:get("velocity_max") - params:get("velocity_min")) + math.min(params:get("velocity_max"), params:get("velocity_min"))
-    next = next / 127
-    if should_play then engine.amp(next) end
+    local velocity
+    if machine.active then
+        velocity = machine:update_sequence_and_get_value()
+        velocity = velocity * math.abs(params:get("velocity_max") - params:get("velocity_min")) + math.min(params:get("velocity_max"), params:get("velocity_min"))
+        velocity = velocity / 127
+    else
+        velocity = machine:get_default()
+    end
+    if should_play then engine.amp(velocity) end
 
     machine = machines['notes']
-    next = machine:update_sequence_and_get_value()
-    next = math.floor(next * params:get("octave_range") * 12 + params:get("root_note"))
-    next = mu.snap_note_to_array(next, scale_notes)
-    if should_play then engine.hz(mu.note_num_to_freq(next)) end
+    local note
+    if machine.active then
+        note = machine:update_sequence_and_get_value()
+        note = math.floor(note * params:get("octave_range") * 12 + params:get("root_note"))
+        note = mu.snap_note_to_array(note, scale_notes)
+    else
+        note = machine:get_default()
+    end
+    if should_play then engine.hz(mu.note_num_to_freq(note)) end
 
     redraw()
 end
@@ -255,35 +300,39 @@ function enc(index, delta)
         end
     end
 
-    if not alt then
-        if index==2 then
-            current_machine:set_steps_delta(delta)
-        elseif index==3 then
-            current_machine:set_knob_delta(delta)
+    if current_machine.active then
+        if not alt then
+            if index==2 then
+                current_machine:set_steps_delta(delta)
+            elseif index==3 then
+                current_machine:set_knob_delta(delta)
+            end
+        else
+            if current_machine.id == 'notes' then control_note_page(index, delta)
+            elseif current_machine.id == 'velocity' then control_velocity_page(index, delta)
+            elseif current_machine.id == 'ratcheting' then control_ratcheting_page(index, delta)
+            elseif current_machine.id == 'duration' then control_duration_page(index, delta)
+            elseif current_machine.id == 'probability' then control_probability_page(index, delta) end
         end
-    else
-        if current_machine.id == 'notes' then control_note_page(index, delta)
-        elseif current_machine.id == 'velocity' then control_velocity_page(index, delta)
-        elseif current_machine.id == 'ratcheting' then control_ratcheting_page(index, delta)
-        elseif current_machine.id == 'duration' then control_duration_page(index, delta)
-        elseif current_machine.id == 'probability' then control_probability_page(index, delta) end
     end
 
     redraw()
 end
 
 function key(index, state)
-    if index == 1 then
-        alt = state == 1
-        current_machine:set_dials_active(not alt)
-    elseif index == 2 and state == 1 then
-        if alt then current_machine:move_to_next_position()
-        else current_machine:toggle_running() end
-    elseif index == 3 and state == 1 then
-        if alt then current_machine:randomize_current_step()
-        else current_machine:init_sequence() end
+    if current_machine.active then
+        if index == 1 then
+            alt = state == 1
+            current_machine:set_dials_active(not alt)
+        elseif index == 2 and state == 1 then
+            if alt then current_machine:move_to_next_position()
+            else current_machine:toggle_running() end
+        elseif index == 3 and state == 1 then
+            if alt then current_machine:randomize_current_step()
+            else current_machine:init_sequence() end
+        end
+        redraw()
     end
-    redraw()
 end
 
 text_positions = {
