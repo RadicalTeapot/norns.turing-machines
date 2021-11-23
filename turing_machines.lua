@@ -10,7 +10,7 @@
 --
 -- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
 --
--- Copy TestEngine into lib folder and rename it to TuringEngine, add synth control params
+-- Add synth control params
 --
 -- Refactor: Add name of extra two params (ones displayed on pages) to machines so the control... and draw...
 -- methods can be implemented there and simplify this file
@@ -27,7 +27,7 @@ Machine = include('lib/machine')
 machines = {}
 current_machine = nil
 
-engine.name = 'TestEngine'
+engine.name = 'TuringEngine'
 
 scale_notes = {}
 running = true
