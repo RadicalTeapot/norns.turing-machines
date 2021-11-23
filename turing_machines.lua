@@ -8,7 +8,7 @@
 --
 -- Add pan machine
 --
--- Add midi and output control (similar to awake)
+-- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
 --
 -- Add synth params control
 --
@@ -87,7 +87,7 @@ function set_params()
 
     -- Notes
     local machine = machines['notes']
-    params:add_group(machine.label, 8)
+    params:add_group(machine.label, 9)
     local cs_NOTE = controlspec.MIDINOTE:copy()
     cs_NOTE.default = 48
     cs_NOTE.step = 1
@@ -102,7 +102,7 @@ function set_params()
 
     -- Cutoff
     machine = machines['cutoff']
-    params:add_group(machine.label, 7)
+    params:add_group(machine.label, 8)
     local cs_FREQ = controlspec.new(50,5000,'exp',10,1000,'Hz')
     machine:add_params(cs_SEQL, cs_KNOB, cs_FREQ, cs_CLKDIV)
     cs_FREQ = cs_FREQ:copy()
@@ -114,7 +114,7 @@ function set_params()
 
     -- Velocity
     machine = machines['velocity']
-    params:add_group(machine.label, 7)
+    params:add_group(machine.label, 8)
     local cs_V = controlspec.MIDIVELOCITY:copy()
     cs_V.default = 64
     machine:add_params(cs_SEQL, cs_KNOB, cs_V, cs_CLKDIV)
@@ -127,7 +127,7 @@ function set_params()
 
     -- Ratcheting
     machine = machines['ratcheting']
-    params:add_group(machine.label, 7)
+    params:add_group(machine.label, 8)
     local cs_RAT = controlspec.new(1,#ratcheting_options,'lin',1,1)
     machine:add_params(cs_SEQL, cs_KNOB, cs_RAT, cs_CLKDIV)
     cs_RAT = cs_RAT:copy()
@@ -138,7 +138,7 @@ function set_params()
 
     -- Duration
     machine = machines['duration']
-    params:add_group(machine.label, 7)
+    params:add_group(machine.label, 8)
     local cs_DUR = controlspec.new(1,#durations_labels,'lin',1,1)
     machine:add_params(cs_SEQL, cs_KNOB, cs_DUR, cs_CLKDIV)
     cs_DUR = cs_DUR:copy()
@@ -149,7 +149,7 @@ function set_params()
 
     -- Probability
     machine = machines['probability']
-    params:add_group(machine.label, 7)
+    params:add_group(machine.label, 8)
     local cs_PROB = controlspec.AMP:copy()
     cs_PROB.default = 1
     machine:add_params(cs_SEQL, cs_KNOB, cs_PROB, cs_CLKDIV)
