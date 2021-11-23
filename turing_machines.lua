@@ -6,8 +6,6 @@
 
 -- TODO
 --
--- Change active and running trigger params to binary params so they can show their state and be saved in presets
---
 -- Add pan machine
 --
 -- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
@@ -182,7 +180,7 @@ function update()
         if running then
             local machine = machines['ratcheting']
             local ratcheting_index
-            if machine.active then
+            if machine:get_active() then
                 ratcheting_index = machine:update_sequence_and_get_value()
                 ratcheting_index = math.floor(ratcheting_index * math.abs(params:get("ratcheting_max") - params:get("ratcheting_min")) + math.min(params:get("ratcheting_max"), params:get("ratcheting_min")) + 0.5) -- + 0.5 to round instead of floor
             else
@@ -200,7 +198,7 @@ end
 function play_next_note()
     local machine = machines['probability']
     local probability
-    if machine.active then
+    if machine:get_active() then
         probability = machine:update_sequence_and_get_value()
         probability = probability * math.abs(params:get("probability_max") - params:get("probability_min")) + math.min(params:get("probability_max"), params:get("probability_min"))
     else
@@ -210,7 +208,7 @@ function play_next_note()
 
     machine = machines['duration']
     local duration_index
-    if machine.active then
+    if machine:get_active() then
         duration_index = machine:update_sequence_and_get_value()
         duration_index = math.floor(duration_index * math.abs(params:get("duration_max") - params:get("duration_min")) + math.min(params:get("duration_max"), params:get("duration_min")) + 0.5)
     else
@@ -224,7 +222,7 @@ function play_next_note()
 
     machine = machines['velocity']
     local velocity
-    if machine.active then
+    if machine:get_active() then
         velocity = machine:update_sequence_and_get_value()
         velocity = velocity * math.abs(params:get("velocity_max") - params:get("velocity_min")) + math.min(params:get("velocity_max"), params:get("velocity_min"))
         velocity = velocity / 127
@@ -235,7 +233,7 @@ function play_next_note()
 
     machine = machines['cutoff']
     local cutoff
-    if machine.active then
+    if machine:get_active() then
         cutoff = machine:update_sequence_and_get_value()
         cutoff = cutoff * math.abs(params:get("cutoff_max") - params:get("cutoff_min")) + math.min(params:get("cutoff_max"), params:get("cutoff_min"))
     else
@@ -245,7 +243,7 @@ function play_next_note()
 
     machine = machines['notes']
     local note
-    if machine.active then
+    if machine:get_active() then
         note = machine:update_sequence_and_get_value()
         note = math.floor(note * params:get("octave_range") * 12 + params:get("root_note"))
         note = mu.snap_note_to_array(note, scale_notes)
@@ -340,7 +338,7 @@ function enc(index, delta)
         end
     end
 
-    if current_machine.active then
+    if current_machine:get_active() then
         if not alt then
             if index==2 then
                 current_machine:set_steps_delta(delta)
@@ -361,7 +359,7 @@ function enc(index, delta)
 end
 
 function key(index, state)
-    if current_machine.active then
+    if current_machine:get_active() then
         if index == 1 then
             alt = state == 1
             current_machine:set_dials_active(not alt)

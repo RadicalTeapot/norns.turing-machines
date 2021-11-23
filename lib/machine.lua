@@ -3,7 +3,7 @@ ui = require 'ui'
 local Machine = {}
 Machine.__index = Machine
 
-function Machine.new(id, label, sequence_length, running, active)
+function Machine.new(id, label, sequence_length)
     local s = setmetatable({}, Machine)
     s.id = id or 'machine'
     s.label = label or id or 'Machine'
@@ -12,10 +12,6 @@ function Machine.new(id, label, sequence_length, running, active)
     s.sequence_length = sequence_length or 16
     -- Current step position in sequence array
     s.position = 1
-    -- Whether this machine is running or froze on current step
-    s.running = running or true
-    -- Whether this machine is active or its default value is used
-    s.active = active or true
     -- Link to previous machine in machines list
     s.previous = nil
     -- Link to next machine in machines list
@@ -31,10 +27,11 @@ function Machine.new(id, label, sequence_length, running, active)
 end
 
 function Machine:add_params(sequence_controlspec, knob_controlspec, default_value_controlspec, clock_div_controlspec)
-    params:add{type="trigger", id=self.id.."_active", name="Active", action=function() self:toggle_active() end}
+    params:add_binary(self.id.."_active", "Active", "toggle", 1)
+    params:set_action(self.id..'_active', function() self:set_dials_active(params:get(self.id..'_active') == 1) end)
     params:add_control(self.id.."_steps", "Steps", sequence_controlspec)
     params:add_control(self.id.."_knob", "Knob", knob_controlspec)
-    params:add{type="trigger", id=self.id.."_running", name="Running", action=function() self:toggle_running() end}
+    params:add_binary(self.id.."_running", "Running", "toggle", 1)
     params:add_control(self.id..'_default', "Default", default_value_controlspec)
     params:add_control(self.id..'_clock_div', "Clock div", clock_div_controlspec)
 
@@ -88,12 +85,11 @@ function Machine:get_default()
 end
 
 function Machine:toggle_running()
-    self.running = not self.running
+    params:set(self.id..'_running', (params:get(self.id..'_running') == 0) and 1 or 0)
 end
 
-function Machine:toggle_active()
-    self.active = not self.active
-    self:set_dials_active(self.active)
+function Machine:get_active()
+    return params:get(self.id..'_active') == 1
 end
 
 function Machine:step_name(step)
@@ -119,9 +115,9 @@ function Machine:value_at(position)
 end
 
 function Machine:update_sequence_and_get_value()
-    self:mutate_sequence()
     local current_value = self:current_value()
-    if self.running then
+    if params:get(self.id..'_running') == 1 then
+        self:mutate_sequence()
         if self.clock_count >= params:get(self.id..'_clock_div') then
             self:move_to_next_position()
             self.clock_count = 1
