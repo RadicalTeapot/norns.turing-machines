@@ -6,11 +6,16 @@
 
 -- TODO
 --
+-- Fix issue with presets
+-- (Also sequences are not saved in presets right now as they're not params, make them params (each step a param) and hide them using params:hide)
+--
+-- Change active and running trigger params to binary params so they can show their state and be saved in presets
+--
 -- Add pan machine
 --
 -- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
 --
--- Add synth params control
+-- Copy TestEngine into lib folder and rename it to TuringEngine, add synth control params
 --
 -- Refactor: Add name of extra two params (ones displayed on pages) to machines so the control... and draw...
 -- methods can be implemented there and simplify this file
@@ -27,7 +32,7 @@ Machine = include('lib/machine')
 machines = {}
 current_machine = nil
 
-engine.name = 'PolyPerc'
+engine.name = 'TestEngine'
 
 scale_notes = {}
 running = true
@@ -161,6 +166,10 @@ function set_params()
     params:add_control("probability_max", "Max", cs_PROB)
 
     params:default()
+    -- Refresh dials of all machines to match default preset
+    for _, machine in pairs(machines) do
+        machine:refresh_dials_values(true, true)
+    end
 end
 
 function build_scale()
@@ -209,7 +218,10 @@ function play_next_note()
         duration_index = machine:get_default()
     end
     local duration = durations_values[duration_index]
-    if should_play then engine.release(clock:get_beat_sec() * duration) end
+    if should_play then
+        engine.attack(clock:get_beat_sec() * duration * 0.1)
+        engine.release(clock:get_beat_sec() * duration * 0.9)
+    end
 
     machine = machines['velocity']
     local velocity

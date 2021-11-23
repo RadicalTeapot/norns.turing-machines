@@ -49,10 +49,7 @@ end
 
 function Machine:set_steps_delta(delta)
     params:delta(self.id..'_steps', delta)
-
-    local new_value = params:get(self.id..'_steps')
-    self.dials.steps:set_value(new_value)
-    self.dials.steps:set_marker_position(1, new_value)
+    self:refresh_dials_values(true, false)
 end
 
 function Machine:get_knob()
@@ -61,10 +58,21 @@ end
 
 function Machine:set_knob_delta(delta)
     params:delta(self.id..'_knob', delta)
+    self:refresh_dials_values(false, true)
+end
 
-    local new_value = get_linexp_value(params:get(self.id..'_knob'))
-    self.dials.knob:set_value(new_value)
-    self.dials.knob:set_marker_position(1, new_value)
+function Machine:refresh_dials_values(refresh_steps, refresh_knob)
+    if refresh_steps then
+        local new_value = params:get(self.id..'_steps')
+        self.dials.steps:set_value(new_value)
+        self.dials.steps:set_marker_position(1, new_value)
+    end
+
+    if refresh_knob then
+        local new_value = get_linexp_value(params:get(self.id..'_knob'))
+        self.dials.knob:set_value(new_value)
+        self.dials.knob:set_marker_position(1, new_value)
+    end
 end
 
 function Machine:get_default()
