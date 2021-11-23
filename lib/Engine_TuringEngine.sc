@@ -1,6 +1,6 @@
 Engine_TuringEngine : CroneEngine {
     var type = 0;
-	var amp = 0;
+	var amp = 0.0;
     var freq = 440;
     var pw = 0.5;
     var cutoff = 500;
@@ -16,7 +16,7 @@ Engine_TuringEngine : CroneEngine {
             arg out, freq=freq, pw=pw, cutoff=cutoff, attack=attack, release=release, amp=amp, type=type;
             var osc = Select.ar(type, [Pulse.ar(freq, pw), SinOsc.ar(freq), Saw.ar(freq), LFTri.ar(freq)]);
             var filter = MoogFF.ar(osc, cutoff);
-            var env = Env.perc(attack, release).kr(2) * amp;
+            var env = Env.perc(attack, release, amp).kr(2);
             Out.ar(out, Pan2.ar(filter*env, 0));
 		}).add;
 

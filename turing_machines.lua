@@ -10,8 +10,6 @@
 --
 -- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
 --
--- Add synth control params
---
 -- Refactor: Add name of extra two params (ones displayed on pages) to machines so the control... and draw...
 -- methods can be implemented there and simplify this file
 --
@@ -33,6 +31,7 @@ scale_notes = {}
 running = true
 alt = false
 
+engine_types={'Pulse', 'Sin', 'Saw', 'Tri'}
 ratcheting_options = {1, 2, 3, 4, 6, 8, 12, 16, 24}
 durations_labels = {'1', '1/2', '1/4', '1/8', '1/16'}
 durations_values = {1, 1/2, 1/4, 1/8, 1/16}
@@ -80,6 +79,21 @@ function set_params()
 
     params:add{type="trigger", id="start", name="Start", action=function() reset() start() end}
     params:add{type="trigger", id="stop", name="Stop", action=function() stop() end}
+
+    params:add_group('Synth', 4)
+    local cs = controlspec.new(1,#engine_types,'lin',1,1,'')
+    params:add{type="control", id="type", name="Type", controlspec=cs,
+        formatter=function(param) return engine_types[param:get()] end,
+        action=function(x) engine.type(x) end}
+    cs = controlspec.new(0,1,'lin',0.05,0.25,'')
+    params:add{type="control", id="amp", name="Amp", controlspec=cs, action=function(x) engine.amp(x) end}
+    cs = controlspec.new(1,#durations_labels,'lin',1,4,'')
+    params:add{type="control", id="attack", name="Attack", controlspec=cs,
+        formatter=function(param) return durations_labels[param:get()] end,
+        action=function(x) engine.attack(durations_values[x]) end}
+    cs = controlspec.new(0,1,'lin',0.05,0.5,'')
+    params:add{type="control", id="pw", name="Pulse width", controlspec=cs, action=function(x) engine.pw(x) end}
+
 
     params:add_separator("Machines")
 
@@ -216,8 +230,7 @@ function play_next_note()
     end
     local duration = durations_values[duration_index]
     if should_play then
-        engine.attack(clock:get_beat_sec() * duration * 0.1)
-        engine.release(clock:get_beat_sec() * duration * 0.9)
+        engine.release(clock:get_beat_sec() * duration)
     end
 
     machine = machines['velocity']
