@@ -10,7 +10,6 @@ function Machine.new(id, label, sequence_length, running, active)
 
     -- Length of the sequence
     s.sequence_length = sequence_length or 16
-    s:init_sequence()
     -- Current step position in sequence array
     s.position = 1
     -- Whether this machine is running or froze on current step
@@ -41,6 +40,15 @@ function Machine:add_params(sequence_controlspec, knob_controlspec, default_valu
 
     self.dials.steps:set_value(sequence_controlspec.default)
     self.dials.knob:set_value(get_linexp_value(knob_controlspec.default))
+end
+
+function Machine:add_hidden_params()
+    local id
+    for i=0,self.sequence_length do
+        id = self.id..'_'..i
+        params:add_number(id, '', 0, 1, 0)
+        params:hide(id)
+    end
 end
 
 function Machine:get_steps()
@@ -88,20 +96,31 @@ function Machine:toggle_active()
     self:set_dials_active(self.active)
 end
 
+function Machine:step_name(step)
+    return self.id..'_'..step
+end
+
 function Machine:init_sequence()
-    self.sequence = {}
     for i=1,self.sequence_length do
-        self.sequence[i] = math.random()
+        params:set(self:step_name(i), math.random())
     end
 end
 
 function Machine:randomize_current_step()
-    self.sequence[self.position] = math.random()
+    params:set(self:step_name(self.position), math.random())
+end
+
+function Machine:current_value()
+    return self:value_at(self.position)
+end
+
+function Machine:value_at(position)
+    return params:get(self:step_name(position))
 end
 
 function Machine:update_sequence_and_get_value()
     self:mutate_sequence()
-    local current_value = self.sequence[self.position]
+    local current_value = self:current_value()
     if self.running then
         if self.clock_count >= params:get(self.id..'_clock_div') then
             self:move_to_next_position()
@@ -123,7 +142,7 @@ function Machine:mutate_sequence()
     if knob < 50 then
         local probability = 50 - knob
         if math.random(50) <= probability then
-            self.sequence[self.position] = math.random()
+            self:randomize_current_step()
         end
     elseif knob > 50 then
         local probability = knob - 50
@@ -135,9 +154,9 @@ function Machine:mutate_sequence()
             end
 
             -- Swap value with other position
-            local tmp = self.sequence[other_position]
-            self.sequence[other_position] = self.sequence[self.position]
-            self.sequence[self.position] = tmp
+            local tmp = self:value_at(other_position)
+            params:set(self:step_name(other_position), self:current_value())
+            params:set(self:step_name(self.position), tmp)
         end
     end
 end
@@ -149,7 +168,7 @@ function Machine:draw_sequence(x, y, scale)
     if not self.active then max_level = 7 end
     for i=0,math.min(steps - 1, 7) do
         index = util.wrap(self.position + i, 1, steps)
-        screen.level(math.floor(self.sequence[index] * max_level + 1))
+        screen.level(math.floor(self:value_at(index) * max_level + 1))
         screen.rect(x + i * 8, y - scale, scale, scale)
         screen.fill()
     end

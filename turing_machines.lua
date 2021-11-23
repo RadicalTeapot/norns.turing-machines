@@ -6,9 +6,6 @@
 
 -- TODO
 --
--- Fix issue with presets
--- (Also sequences are not saved in presets right now as they're not params, make them params (each step a param) and hide them using params:hide)
---
 -- Change active and running trigger params to binary params so they can show their state and be saved in presets
 --
 -- Add pan machine
@@ -73,6 +70,8 @@ function init_machines()
         end
         previous = machine
         machines[machine_ids[i]] = machine
+        machine:add_hidden_params()
+        machine:init_sequence()
     end
 
     current_machine = machines['notes']
