@@ -29,14 +29,15 @@ function Machine.new(id, label, sequence_length)
     return s
 end
 
-function Machine:add_params(sequence_controlspec, knob_controlspec, default_value_controlspec, clock_div_controlspec)
+function Machine:add_params(sequence_controlspec, knob_controlspec, clock_div_controlspec, default_value_controlspec, default_formatter)
     params:add_binary(self.id.."_active", "Active", "toggle", 1)
     params:set_action(self.id..'_active', function() self:set_dials_active(params:get(self.id..'_active') == 1) end)
     params:add_control(self.id.."_steps", "Steps", sequence_controlspec)
     params:add_control(self.id.."_knob", "Knob", knob_controlspec)
-    params:add_binary(self.id.."_running", "Running", "toggle", 1)
-    params:add_control(self.id..'_default', "Default", default_value_controlspec)
     params:add_control(self.id..'_clock_div', "Clock div", clock_div_controlspec)
+    params:add_binary(self.id.."_running", "Running", "toggle", 1)
+    params:add{type='control', id=self.id..'_default', name='Default', controlspec=default_value_controlspec,
+        formatter=default_formatter}
 
     self.dials.steps:set_value(sequence_controlspec.default)
     self.dials.knob:set_value(get_linexp_value(knob_controlspec.default))
@@ -180,8 +181,33 @@ function Machine:mutate_sequence()
 end
 
 function Machine:extra_controls_delta(encoder_index, delta)
-    -- Encoder 2 controls extra params 1 and encoder 3 params 2
-    params:delta(self.extra_params[encoder_index-1].id, delta)
+    if self:get_active() then
+        -- Encoder 2 controls extra params 1 and encoder 3 params 2
+        params:delta(self.extra_params[encoder_index-1].id, delta)
+    else
+        if encoder_index == 2 then
+            params:delta(self.id..'_default', delta)
+        end
+    end
+end
+
+function Machine:redraw()
+    if self:get_active() then self:draw_dials() end
+    self:draw_title(0, 5)
+    if self:get_active() then
+        self:draw_extra_params(0, 25, 10, alt)
+        self:draw_sequence(60, 5, 5)
+    else
+        screen.level(15)
+        screen.move(60, 5)
+        screen.text("DISABLED")
+        screen.level(1)
+        screen.move(0, 25)
+        screen.text('Default value:')
+        screen.level(15)
+        screen.move(0,35)
+        screen.text(params:string(self.id..'_default'))
+    end
 end
 
 function Machine:draw_sequence(x, y, scale)

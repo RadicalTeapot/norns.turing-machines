@@ -98,21 +98,22 @@ function set_params()
     local cs_NOTE = controlspec.MIDINOTE:copy()
     cs_NOTE.default = 48
     cs_NOTE.step = 1
-    machine:add_params(cs_SEQL, cs_KNOB, cs_NOTE, cs_CLKDIV)
+    local note_formatter = function(param) return mu.note_num_to_name(param:get(), true) end
+    machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_NOTE, note_formatter)
     params:add{type="control", id="root_note", name="Root note", controlspec=cs_NOTE,
-    formatter=function(param) return mu.note_num_to_name(param:get(), true) end, action=function(x) build_scale() end}
+        formatter=note_formatter, action=function(x) build_scale() end}
     params:add{type="number", id="scale", name="Scale", min=1, max=#mu.SCALES, default=1,
-    formatter=function(param) return mu.SCALES[param:get()].name end, action=function(x) build_scale() end}
+        formatter=function(param) return mu.SCALES[param:get()].name end, action=function(x) build_scale() end}
     local cs_OCTR = controlspec.new(1,4,'lin',1,2,'')
     params:add{type="control", id="octave_range", name="Octave range", controlspec=cs_OCTR, formatter=fm.round(1),
-    action=function(x) build_scale() end}
+        action=function(x) build_scale() end}
     machine:set_extra_params({'root_note', 'octave_range'}, {'Root note', 'Oct. Range'})
 
     -- Cutoff
     machine = machines['cutoff']
     params:add_group(machine.label, 8)
     local cs_FREQ = controlspec.new(50,5000,'exp',10,1000,'Hz')
-    machine:add_params(cs_SEQL, cs_KNOB, cs_FREQ, cs_CLKDIV)
+    machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_FREQ)
     cs_FREQ = cs_FREQ:copy()
     cs_FREQ.default = 400
     params:add_control("cutoff_min", "Min", cs_FREQ, fm.round(1))
@@ -126,7 +127,7 @@ function set_params()
     params:add_group(machine.label, 8)
     local cs_V = controlspec.MIDIVELOCITY:copy()
     cs_V.default = 64
-    machine:add_params(cs_SEQL, cs_KNOB, cs_V, cs_CLKDIV)
+    machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_V)
     cs_V = controlspec.MIDIVELOCITY:copy()
     cs_V.default = 30
     params:add_control("velocity_min", "Min", cs_V, fm.round(1))
@@ -139,7 +140,7 @@ function set_params()
     machine = machines['ratcheting']
     params:add_group(machine.label, 8)
     local cs_RAT = controlspec.new(1,#ratcheting_options,'lin',1,1)
-    machine:add_params(cs_SEQL, cs_KNOB, cs_RAT, cs_CLKDIV)
+    machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_RAT)
     cs_RAT = cs_RAT:copy()
     params:add{type="control", id="ratcheting_min", name="Min", controlspec=cs_RAT, formatter=function(param) return ratcheting_options[param:get()] end}
     cs_RAT = cs_RAT:copy()
@@ -151,7 +152,7 @@ function set_params()
     machine = machines['release']
     params:add_group(machine.label, 8)
     local cs_DUR = controlspec.new(1,#durations_labels,'lin',1,1)
-    machine:add_params(cs_SEQL, cs_KNOB, cs_DUR, cs_CLKDIV)
+    machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_DUR)
     cs_DUR = cs_DUR:copy()
     params:add{type="control", id="duration_min", name="Min", controlspec=cs_DUR, formatter=function(param) return durations_labels[param:get()] end}
     cs_DUR = cs_DUR:copy()
@@ -164,7 +165,7 @@ function set_params()
     params:add_group(machine.label, 8)
     local cs_PROB = controlspec.AMP:copy()
     cs_PROB.default = 1
-    machine:add_params(cs_SEQL, cs_KNOB, cs_PROB, cs_CLKDIV)
+    machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_PROB)
     cs_PROB = controlspec.AMP:copy()
     cs_PROB.default = 0.75
     params:add_control("probability_min", "Min", cs_PROB)
@@ -176,8 +177,8 @@ function set_params()
     -- Pan
     machine = machines['pan']
     params:add_group(machine.label, 8)
-    local cs_PAN = controlspec.new(-1,1,'lin',0.1,1)
-    machine:add_params(cs_SEQL, cs_KNOB, cs_PAN, cs_CLKDIV)
+    local cs_PAN = controlspec.new(-1,1,'lin',0.1,0)
+    machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_PAN)
     cs_PAN = cs_PAN:copy()
     cs_PAN.default = -0.25
     params:add_control("pan_min", "Min", cs_PAN)
@@ -282,6 +283,8 @@ function enc(index, delta)
         else
             current_machine:extra_controls_delta(index, delta)
         end
+    else
+        current_machine:extra_controls_delta(index, delta)
     end
 
     redraw()
@@ -306,11 +309,6 @@ end
 function redraw()
     screen.clear()
     screen.fill()
-
-    current_machine:draw_dials()
-    current_machine:draw_title(0, 5)
-    current_machine:draw_extra_params(0, 25, 10, alt)
-    current_machine:draw_sequence(60, 5, 5)
-
+    current_machine:redraw()
     screen.update()
 end
