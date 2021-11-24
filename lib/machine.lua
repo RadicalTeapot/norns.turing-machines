@@ -41,7 +41,7 @@ end
 
 function Machine:add_hidden_params()
     local id
-    for i=0,self.sequence_length do
+    for i=1,self.sequence_length do
         id = self.id..'_'..i
         params:add_number(id, '', 0, 1, 0)
         params:hide(id)
