@@ -25,8 +25,8 @@ alt = false
 
 engine_types={'Pulse', 'Sin', 'Saw', 'Tri'}
 ratcheting_options = {1, 2, 3, 4, 6, 8, 12, 16, 24}
-releases_labels = {'1', '1/2', '1/4', '1/8', '1/16'}
-releases_values = {1, 1/2, 1/4, 1/8, 1/16}
+releases_labels = {'4', '2', '1', '1/2', '1/4', '1/8', '1/16'}
+releases_values = {4, 2, 1, 1/2, 1/4, 1/8, 1/16}
 releases = {}
 for i=1,#releases_labels do releases[releases_labels[i]] = releases_values end
 
@@ -149,12 +149,12 @@ function set_params()
     -- Release
     machine = machines['release']
     params:add_group(machine.label, 8)
-    local cs_DUR = controlspec.new(1,#releases_labels,'lin',1,1)
+    local cs_DUR = controlspec.new(1,#releases_labels,'lin',1,3)
     machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_DUR)
     cs_DUR = cs_DUR:copy()
     params:add{type="control", id="release_min", name="Min", controlspec=cs_DUR, formatter=function(param) return releases_labels[param:get()] end}
     cs_DUR = cs_DUR:copy()
-    cs_DUR.default = 3
+    cs_DUR.default = 5
     params:add{type="control", id="release_max", name="Max", controlspec=cs_DUR, formatter=function(param) return releases_labels[param:get()] end}
     machine:set_extra_params({'release_min', 'release_max'}, {'Min', 'Max'})
 
