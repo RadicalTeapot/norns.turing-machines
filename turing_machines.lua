@@ -6,14 +6,14 @@
 
 -- TODO
 --
--- Add pan machine
+-- Add pan machine (and pan control to engine)
+--
+-- Figure out why engine amp is not working
 --
 -- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
 --
 -- Refactor: Add name of extra two params (ones displayed on pages) to machines so the control... and draw...
 -- methods can be implemented there and simplify this file
---
--- Refactor: Rename duration to env or release
 
 mu = require "musicutil"
 ui = require 'ui'
@@ -28,7 +28,6 @@ current_machine = nil
 engine.name = 'TuringEngine'
 
 scale_notes = {}
-running = true
 alt = false
 
 engine_types={'Pulse', 'Sin', 'Saw', 'Tri'}
@@ -55,8 +54,8 @@ function init()
 end
 
 function init_machines()
-    local machine_ids = {"notes", "cutoff", "velocity", "ratcheting", "duration", "probability"}
-    local machine_labels = {"Notes", "Cutoff", "Velocity", "Ratcheting", "Duration", "Probability"}
+    local machine_ids = {"notes", "cutoff", "velocity", "ratcheting", "release", "probability"}
+    local machine_labels = {"Notes", "Cutoff", "Velocity", "Ratcheting", "Release", "Probability"}
     local previous = nil
     local machine = nil
     for i=1,#machine_ids do
@@ -77,8 +76,8 @@ end
 function set_params()
     params:add_separator("Common")
 
-    params:add{type="trigger", id="start", name="Start", action=function() reset() start() end}
-    params:add{type="trigger", id="stop", name="Stop", action=function() stop() end}
+    params:add{type="binary", id="running", name="Running", default=1, behavior='toggle',
+        action=function(x) if x == 1 then reset() end end}
 
     params:add_group('Synth', 4)
     local cs = controlspec.new(1,#engine_types,'lin',1,1,'')
@@ -152,8 +151,8 @@ function set_params()
     cs_RAT.default = 4
     params:add{type="control", id="ratcheting_max", name="Max", controlspec=cs_RAT, formatter=function(param) return ratcheting_options[param:get()] end}
 
-    -- Duration
-    machine = machines['duration']
+    -- Release
+    machine = machines['release']
     params:add_group(machine.label, 8)
     local cs_DUR = controlspec.new(1,#durations_labels,'lin',1,1)
     machine:add_params(cs_SEQL, cs_KNOB, cs_DUR, cs_CLKDIV)
@@ -191,7 +190,7 @@ end
 function update()
     while true do
         clock.sync(1)
-        if running then
+        if params:get('running') then
             local machine = machines['ratcheting']
             local ratcheting_index
             if machine:get_active() then
@@ -220,7 +219,7 @@ function play_next_note()
     end
     local should_play = math.random() <= probability
 
-    machine = machines['duration']
+    machine = machines['release']
     local duration_index
     if machine:get_active() then
         duration_index = machine:update_sequence_and_get_value()
@@ -228,9 +227,9 @@ function play_next_note()
     else
         duration_index = machine:get_default()
     end
-    local duration = durations_values[duration_index]
+    local release = durations_values[duration_index]
     if should_play then
-        engine.release(clock:get_beat_sec() * duration)
+        engine.release(clock:get_beat_sec() * release)
     end
 
     machine = machines['velocity']
@@ -266,14 +265,6 @@ function play_next_note()
     if should_play then engine.hz(mu.note_num_to_freq(note)) end
 
     redraw()
-end
-
-function start()
-    running = true
-end
-
-function stop()
-    running = false
 end
 
 function reset()
@@ -363,7 +354,7 @@ function enc(index, delta)
             elseif current_machine.id == 'cutoff' then control_cutoff_page(index, delta)
             elseif current_machine.id == 'velocity' then control_velocity_page(index, delta)
             elseif current_machine.id == 'ratcheting' then control_ratcheting_page(index, delta)
-            elseif current_machine.id == 'duration' then control_duration_page(index, delta)
+            elseif current_machine.id == 'release' then control_duration_page(index, delta)
             elseif current_machine.id == 'probability' then control_probability_page(index, delta) end
         end
     end
@@ -486,7 +477,7 @@ function redraw()
     elseif current_machine.id == 'cutoff' then draw_cutoff_page()
     elseif current_machine.id == 'velocity' then draw_velocity_page()
     elseif current_machine.id == 'ratcheting' then draw_ratcheting_page()
-    elseif current_machine.id == 'duration' then draw_duration_page()
+    elseif current_machine.id == 'release' then draw_duration_page()
     elseif current_machine.id == 'probability' then draw_probability_page() end
 
     current_machine:draw_sequence(60, text_positions.title, 5)
