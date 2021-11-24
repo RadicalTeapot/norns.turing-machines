@@ -178,10 +178,10 @@ function set_params()
     local cs_PAN = controlspec.new(-1,1,'lin',0.1,0)
     machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_PAN)
     cs_PAN = cs_PAN:copy()
-    cs_PAN.default = -0.25
+    cs_PAN.default = -0.3
     params:add_control("pan_min", "Min", cs_PAN)
     cs_PAN = cs_PAN:copy()
-    cs_PAN.default = 0.25
+    cs_PAN.default = 0.3
     params:add_control("pan_max", "Max", cs_PAN)
     machine:set_extra_params({'pan_min', 'pan_max'}, {'Min', 'Max'})
 
