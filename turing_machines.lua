@@ -106,7 +106,7 @@ function set_params()
     local cs_OCTR = controlspec.new(1,4,'lin',1,2,'')
     params:add{type="control", id="octave_range", name="Octave range", controlspec=cs_OCTR, formatter=fm.round(1),
     action=function(x) build_scale() end}
-    machine:set_extra_params({'root_note', 'scale'}, {'Root note', 'Scale'})
+    machine:set_extra_params({'root_note', 'octave_range'}, {'Root note', 'Oct. Range'})
 
     -- Cutoff
     machine = machines['cutoff']
@@ -206,8 +206,8 @@ function round_index(index, min, max)
     return math.floor(index * math.abs(max - min) + math.min(min, max) + 0.5)
 end
 
-function map_note(note, root_note, scale)
-    return math.floor(note * scale * 12 + root_note)
+function map_note(note, root_note, oct_range)
+    return math.floor(note * oct_range * 12 + root_note)
 end
 
 function update()
