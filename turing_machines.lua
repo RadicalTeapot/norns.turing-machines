@@ -8,9 +8,6 @@
 --
 -- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
 --
--- Refactor: Add name of extra two params (ones displayed on pages) to machines so the control... and draw...
--- methods can be implemented there and simplify this file (also the code blocks in play_next_note)
---
 -- Refactor: change all occurences of duration to release
 
 mu = require "musicutil"
@@ -102,13 +99,14 @@ function set_params()
     cs_NOTE.default = 48
     cs_NOTE.step = 1
     machine:add_params(cs_SEQL, cs_KNOB, cs_NOTE, cs_CLKDIV)
-    params:add{type="control", id="root_note", name="Root", controlspec=cs_NOTE,
+    params:add{type="control", id="root_note", name="Root note", controlspec=cs_NOTE,
     formatter=function(param) return mu.note_num_to_name(param:get(), true) end, action=function(x) build_scale() end}
     params:add{type="number", id="scale", name="Scale", min=1, max=#mu.SCALES, default=1,
     formatter=function(param) return mu.SCALES[param:get()].name end, action=function(x) build_scale() end}
     local cs_OCTR = controlspec.new(1,4,'lin',1,2,'')
     params:add{type="control", id="octave_range", name="Octave range", controlspec=cs_OCTR, formatter=fm.round(1),
     action=function(x) build_scale() end}
+    machine:set_extra_params({'root_note', 'scale'}, {'Root note', 'Scale'})
 
     -- Cutoff
     machine = machines['cutoff']
@@ -121,6 +119,7 @@ function set_params()
     cs_FREQ = cs_FREQ:copy()
     cs_FREQ.default = 1600
     params:add_control("cutoff_max", "Max", cs_FREQ, fm.round(1))
+    machine:set_extra_params({'cutoff_min', 'cutoff_max'}, {'Min', 'Max'})
 
     -- Velocity
     machine = machines['velocity']
@@ -134,6 +133,7 @@ function set_params()
     cs_V = controlspec.MIDIVELOCITY:copy()
     cs_V.default = 100
     params:add_control("velocity_max", "Max", cs_V, fm.round(1))
+    machine:set_extra_params({'velocity_min', 'velocity_max'}, {'Min', 'Max'})
 
     -- Ratcheting
     machine = machines['ratcheting']
@@ -145,6 +145,7 @@ function set_params()
     cs_RAT = cs_RAT:copy()
     cs_RAT.default = 4
     params:add{type="control", id="ratcheting_max", name="Max", controlspec=cs_RAT, formatter=function(param) return ratcheting_options[param:get()] end}
+    machine:set_extra_params({'ratcheting_min', 'ratcheting_max'}, {'Min', 'Max'})
 
     -- Release
     machine = machines['release']
@@ -156,6 +157,7 @@ function set_params()
     cs_DUR = cs_DUR:copy()
     cs_DUR.default = 3
     params:add{type="control", id="duration_max", name="Max", controlspec=cs_DUR, formatter=function(param) return durations_labels[param:get()] end}
+    machine:set_extra_params({'duration_min', 'duration_max'}, {'Min', 'Max'})
 
     -- Probability
     machine = machines['probability']
@@ -169,6 +171,7 @@ function set_params()
     cs_PROB = controlspec.AMP:copy()
     cs_PROB.default = 1
     params:add_control("probability_max", "Max", cs_PROB)
+    machine:set_extra_params({'probability_min', 'probability_max'}, {'Min', 'Max'})
 
     -- Pan
     machine = machines['pan']
@@ -181,6 +184,7 @@ function set_params()
     cs_PAN = cs_PAN:copy()
     cs_PAN.default = 0.25
     params:add_control("pan_max", "Max", cs_PAN)
+    machine:set_extra_params({'pan_min', 'pan_max'}, {'Min', 'Max'})
 
     params:default()
     -- Refresh dials of all machines to match default preset
@@ -194,19 +198,23 @@ function build_scale()
         params:get("root_note"), params:get("scale"), params:get("octave_range"))
 end
 
+function round_value(value, min, max)
+    return value * math.abs(max - min) + math.min(min, max)
+end
+
+function round_index(index, min, max)
+    return math.floor(index * math.abs(max - min) + math.min(min, max) + 0.5)
+end
+
+function map_note(note, root_note, scale)
+    return math.floor(note * scale * 12 + root_note)
+end
+
 function update()
     while true do
         clock.sync(1)
         if params:get('running') == 1 then
-            local machine = machines['ratcheting']
-            local ratcheting_index
-            if machine:get_active() then
-                ratcheting_index = machine:update_sequence_and_get_value()
-                ratcheting_index = math.floor(ratcheting_index * math.abs(params:get("ratcheting_max") - params:get("ratcheting_min")) + math.min(params:get("ratcheting_max"), params:get("ratcheting_min")) + 0.5) -- + 0.5 to round instead of floor
-            else
-                ratcheting_index = machine:get_default()
-            end
-            local ratcheting = ratcheting_options[ratcheting_index]
+            local ratcheting = ratcheting_options[machines['ratcheting']:get_next_value(round_index)]
             play_next_note()
             if ratcheting > 1 then
                 ratcheting_metro:start(clock:get_beat_sec() / ratcheting, ratcheting-1)
@@ -216,69 +224,22 @@ function update()
 end
 
 function play_next_note()
-    local machine = machines['probability']
-    local probability
-    if machine:get_active() then
-        probability = machine:update_sequence_and_get_value()
-        probability = probability * math.abs(params:get("probability_max") - params:get("probability_min")) + math.min(params:get("probability_max"), params:get("probability_min"))
-    else
-        probability = machine:get_default()
-    end
+    local probability = machines['probability']:get_next_value(round_value)
     local should_play = math.random() <= probability
 
-    machine = machines['release']
-    local duration_index
-    if machine:get_active() then
-        duration_index = machine:update_sequence_and_get_value()
-        duration_index = math.floor(duration_index * math.abs(params:get("duration_max") - params:get("duration_min")) + math.min(params:get("duration_max"), params:get("duration_min")) + 0.5)
-    else
-        duration_index = machine:get_default()
-    end
-    local release = durations_values[duration_index]
-    if should_play then
-        engine.release(clock:get_beat_sec() * release)
-    end
+    local release = durations_values[machines['release']:get_next_value(round_index)]
+    if should_play then engine.release(clock:get_beat_sec() * release) end
 
-    machine = machines['velocity']
-    local velocity
-    if machine:get_active() then
-        velocity = machine:update_sequence_and_get_value()
-        velocity = velocity * math.abs(params:get("velocity_max") - params:get("velocity_min")) + math.min(params:get("velocity_max"), params:get("velocity_min"))
-        velocity = velocity / 127
-    else
-        velocity = machine:get_default()
-    end
+    local velocity = machines['velocity']:get_next_value(round_value) / 127
     if should_play then engine.amp(velocity) end
 
-    machine = machines['cutoff']
-    local cutoff
-    if machine:get_active() then
-        cutoff = machine:update_sequence_and_get_value()
-        cutoff = cutoff * math.abs(params:get("cutoff_max") - params:get("cutoff_min")) + math.min(params:get("cutoff_max"), params:get("cutoff_min"))
-    else
-        cutoff = machine:get_default()
-    end
+    local cutoff = machines['cutoff']:get_next_value(round_value)
     if should_play then engine.cutoff(cutoff) end
 
-    machine = machines['pan']
-    local cutoff
-    if machine:get_active() then
-        pan = machine:update_sequence_and_get_value()
-        pan = pan * math.abs(params:get("pan_max") - params:get("pan_min")) + math.min(params:get("pan_max"), params:get("pan_min"))
-    else
-        pan = machine:get_default()
-    end
+    local pan = machines['pan']:get_next_value(round_value)
     if should_play then engine.pan(pan) end
 
-    machine = machines['notes']
-    local note
-    if machine:get_active() then
-        note = machine:update_sequence_and_get_value()
-        note = math.floor(note * params:get("octave_range") * 12 + params:get("root_note"))
-        note = mu.snap_note_to_array(note, scale_notes)
-    else
-        note = machine:get_default()
-    end
+    local note = mu.snap_note_to_array(machines['notes']:get_next_value(map_note), scale_notes)
     if should_play then engine.hz(mu.note_num_to_freq(note)) end
 
     redraw()
@@ -302,62 +263,6 @@ function clock.transport.reset()
     reset()
 end
 
-function control_note_page(index, delta)
-    if index==2 then
-        params:delta('root_note', delta)
-    elseif index==3 then
-        params:delta('octave_range', delta)
-    end
-end
-
-function control_cutoff_page(index, delta)
-    if index==2 then
-        params:delta('cutoff_min', delta)
-    elseif index==3 then
-        params:delta('cutoff_max', delta)
-    end
-end
-
-function control_velocity_page(index, delta)
-    if index==2 then
-        params:delta('velocity_min', delta)
-    elseif index==3 then
-        params:delta('velocity_max', delta)
-    end
-end
-
-function control_ratcheting_page(index, delta)
-    if index==2 then
-        params:delta('ratcheting_min', delta)
-    elseif index==3 then
-        params:delta('ratcheting_max', delta)
-    end
-end
-
-function control_duration_page(index, delta)
-    if index==2 then
-        params:delta('duration_min', delta)
-    elseif index==3 then
-        params:delta('duration_max', delta)
-    end
-end
-
-function control_probability_page(index, delta)
-    if index==2 then
-        params:delta('probability_min', delta)
-    elseif index==3 then
-        params:delta('probability_max', delta)
-    end
-end
-
-function control_pan_page(index, delta)
-    if index==2 then
-        params:delta('pan_min', delta)
-    elseif index==3 then
-        params:delta('pan_max', delta)
-    end
-end
-
 function enc(index, delta)
     if index==1 then
         if delta < 0 and current_machine.previous then
@@ -375,13 +280,7 @@ function enc(index, delta)
                 current_machine:set_knob_delta(delta)
             end
         else
-            if current_machine.id == 'notes' then control_note_page(index, delta)
-            elseif current_machine.id == 'cutoff' then control_cutoff_page(index, delta)
-            elseif current_machine.id == 'velocity' then control_velocity_page(index, delta)
-            elseif current_machine.id == 'ratcheting' then control_ratcheting_page(index, delta)
-            elseif current_machine.id == 'release' then control_duration_page(index, delta)
-            elseif current_machine.id == 'probability' then control_probability_page(index, delta)
-            elseif current_machine.id == 'pan' then control_pan_page(index, delta) end
+            current_machine:extra_controls_delta(index, delta)
         end
     end
 
@@ -404,123 +303,14 @@ function key(index, state)
     end
 end
 
-text_positions = {
-    title=5,
-    top_label=25,
-    top_value=35,
-    bottom_label=45,
-    bottom_value=55
-}
-function draw_note_page()
-    screen.level(1)
-    screen.move(0, text_positions.top_label)
-    screen.text('Root note')
-    screen.move(0, text_positions.bottom_label)
-    screen.text('Octaves')
-    if alt then screen.level(15) else screen.level(1) end
-    screen.move(0, text_positions.top_value)
-    screen.text(params:string('root_note'))
-    screen.move(0, text_positions.bottom_value)
-    screen.text(params:string('octave_range'))
-end
-
-function draw_cutoff_page()
-    screen.level(1)
-    screen.move(0, text_positions.top_label)
-    screen.text('Min')
-    screen.move(0, text_positions.bottom_label)
-    screen.text('Max')
-    if alt then screen.level(15) else screen.level(1) end
-    screen.move(0, text_positions.top_value)
-    screen.text(params:string('cutoff_min'))
-    screen.move(0, text_positions.bottom_value)
-    screen.text(params:string('cutoff_max'))
-end
-
-function draw_velocity_page()
-    screen.level(1)
-    screen.move(0, text_positions.top_label)
-    screen.text('Min')
-    screen.move(0, text_positions.bottom_label)
-    screen.text('Max')
-    if alt then screen.level(15) else screen.level(1) end
-    screen.move(0, text_positions.top_value)
-    screen.text(params:string('velocity_min'))
-    screen.move(0, text_positions.bottom_value)
-    screen.text(params:string('velocity_max'))
-end
-
-function draw_ratcheting_page()
-    screen.level(1)
-    screen.move(0, text_positions.top_label)
-    screen.text('Min')
-    screen.move(0, text_positions.bottom_label)
-    screen.text('Max')
-    if alt then screen.level(15) else screen.level(1) end
-    screen.move(0, text_positions.top_value)
-    screen.text(params:string('ratcheting_min'))
-    screen.move(0, text_positions.bottom_value)
-    screen.text(params:string('ratcheting_max'))
-end
-
-function draw_duration_page()
-    screen.level(1)
-    screen.move(0, text_positions.top_label)
-    screen.text('Min')
-    screen.move(0, text_positions.bottom_label)
-    screen.text('Max')
-    if alt then screen.level(15) else screen.level(1) end
-    screen.move(0, text_positions.top_value)
-    screen.text(params:string('duration_min'))
-    screen.move(0, text_positions.bottom_value)
-    screen.text(params:string('duration_max'))
-end
-
-function draw_probability_page()
-    screen.level(1)
-    screen.move(0, text_positions.top_label)
-    screen.text('Min')
-    screen.move(0, text_positions.bottom_label)
-    screen.text('Max')
-    if alt then screen.level(15) else screen.level(1) end
-    screen.move(0, text_positions.top_value)
-    screen.text(params:string('probability_min'))
-    screen.move(0, text_positions.bottom_value)
-    screen.text(params:string('probability_max'))
-end
-
-function draw_pan_page()
-    screen.level(1)
-    screen.move(0, text_positions.top_label)
-    screen.text('Min')
-    screen.move(0, text_positions.bottom_label)
-    screen.text('Max')
-    if alt then screen.level(15) else screen.level(1) end
-    screen.move(0, text_positions.top_value)
-    screen.text(params:string('pan_min'))
-    screen.move(0, text_positions.bottom_value)
-    screen.text(params:string('pan_max'))
-end
-
 function redraw()
     screen.clear()
     screen.fill()
 
     current_machine:draw_dials()
-
-    screen.level(1)
-    screen.move(0, text_positions.title)
-    screen.text(string.upper(current_machine.label))
-
-    if current_machine.id == 'notes' then draw_note_page()
-    elseif current_machine.id == 'cutoff' then draw_cutoff_page()
-    elseif current_machine.id == 'velocity' then draw_velocity_page()
-    elseif current_machine.id == 'ratcheting' then draw_ratcheting_page()
-    elseif current_machine.id == 'release' then draw_duration_page()
-    elseif current_machine.id == 'probability' then draw_probability_page()
-    elseif current_machine.id == 'pan' then draw_pan_page() end
-
-    current_machine:draw_sequence(60, text_positions.title, 5)
+    current_machine:draw_title(0, 5)
+    current_machine:draw_extra_params(0, 25, 10, alt)
+    current_machine:draw_sequence(60, 5, 5)
 
     screen.update()
 end

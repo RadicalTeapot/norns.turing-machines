@@ -16,7 +16,10 @@ function Machine.new(id, label, sequence_length)
     s.previous = nil
     -- Link to next machine in machines list
     s.next = nil
+    -- Number of ticks since last position update
     s.clock_count = 1
+    -- Table of extra params associated with this machine
+    s.extra_params = {}
 
     s.dials = {
         steps=ui.Dial.new(55, 28, 22, 8, 1, s.sequence_length, 1, 1, {s.sequence_length * 0.5}),
@@ -45,6 +48,13 @@ function Machine:add_hidden_params()
         id = self.id..'_'..i
         params:add_number(id, '', 0, 1, 0)
         params:hide(id)
+    end
+end
+
+function Machine:set_extra_params(ids, labels)
+    self.extra_params = {}
+    for i=1,2 do
+        self.extra_params[i] = {id=ids[i], label=labels[i]}
     end
 end
 
@@ -114,6 +124,18 @@ function Machine:value_at(position)
     return params:get(self:step_name(position))
 end
 
+function Machine:get_next_value(map_func)
+    if not map_func then
+        map_func = function(value, min, max) return value * math.abs(max - min) + math.min(min, max) end
+    end
+
+    if self:get_active() then
+        return map_func(self:update_sequence_and_get_value(), params:get(self.extra_params[1].id), params:get(self.extra_params[2].id))
+    else
+        return self:get_default()
+    end
+end
+
 function Machine:update_sequence_and_get_value()
     local current_value = self:current_value()
     if params:get(self.id..'_running') == 1 then
@@ -157,6 +179,11 @@ function Machine:mutate_sequence()
     end
 end
 
+function Machine:extra_controls_delta(encoder_index, delta)
+    -- Encoder 2 controls extra params 1 and encoder 3 params 2
+    params:delta(self.extra_params[encoder_index-1].id, delta)
+end
+
 function Machine:draw_sequence(x, y, scale)
     local index = self.position
     local steps = self:get_steps()
@@ -177,6 +204,25 @@ function Machine:draw_dials()
     screen.text('Steps')
     screen.move(100, 20)
     screen.text('Knob')
+end
+
+function Machine:draw_extra_params(x, y, spacing, active)
+    screen.level(1)
+    screen.move(x, y)
+    screen.text(self.extra_params[1].label)
+    screen.move(x, y + 2 * spacing)
+    screen.text(self.extra_params[2].label)
+    if active then screen.level(15) else screen.level(1) end
+    screen.move(x, y + spacing)
+    screen.text(params:string(self.extra_params[1].id))
+    screen.move(x, y + 3 * spacing)
+    screen.text(params:string(self.extra_params[2].id))
+end
+
+function Machine:draw_title(x, y)
+    screen.level(1)
+    screen.move(x, y)
+    screen.text(string.upper(current_machine.label))
 end
 
 function Machine:set_dials_active(state)
