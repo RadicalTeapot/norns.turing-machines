@@ -7,8 +7,6 @@
 -- TODO
 --
 -- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
---
--- Refactor: change all occurences of duration to release
 
 mu = require "musicutil"
 ui = require 'ui'
@@ -27,10 +25,10 @@ alt = false
 
 engine_types={'Pulse', 'Sin', 'Saw', 'Tri'}
 ratcheting_options = {1, 2, 3, 4, 6, 8, 12, 16, 24}
-durations_labels = {'1', '1/2', '1/4', '1/8', '1/16'}
-durations_values = {1, 1/2, 1/4, 1/8, 1/16}
-durations = {}
-for i=1,#durations_labels do durations[durations_labels[i]] = durations_values end
+releases_labels = {'1', '1/2', '1/4', '1/8', '1/16'}
+releases_values = {1, 1/2, 1/4, 1/8, 1/16}
+releases = {}
+for i=1,#releases_labels do releases[releases_labels[i]] = releases_values end
 
 ratcheting_metro = metro.init()
 
@@ -79,10 +77,10 @@ function set_params()
     params:add{type="control", id="type", name="Type", controlspec=cs,
         formatter=function(param) return engine_types[param:get()] end,
         action=function(x) engine.type(x) end}
-    cs = controlspec.new(1,#durations_labels,'lin',1,4,'')
+    cs = controlspec.new(1,#releases_labels,'lin',1,4,'')
     params:add{type="control", id="attack", name="Attack", controlspec=cs,
-        formatter=function(param) return durations_labels[param:get()] end,
-        action=function(x) engine.attack(durations_values[x]) end}
+        formatter=function(param) return releases_labels[param:get()] end,
+        action=function(x) engine.attack(releases_values[x]) end}
     cs = controlspec.new(0,1,'lin',0.05,0.5,'')
     params:add{type="control", id="pw", name="Pulse width", controlspec=cs, action=function(x) engine.pw(x) end}
 
@@ -151,14 +149,14 @@ function set_params()
     -- Release
     machine = machines['release']
     params:add_group(machine.label, 8)
-    local cs_DUR = controlspec.new(1,#durations_labels,'lin',1,1)
+    local cs_DUR = controlspec.new(1,#releases_labels,'lin',1,1)
     machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_DUR)
     cs_DUR = cs_DUR:copy()
-    params:add{type="control", id="duration_min", name="Min", controlspec=cs_DUR, formatter=function(param) return durations_labels[param:get()] end}
+    params:add{type="control", id="release_min", name="Min", controlspec=cs_DUR, formatter=function(param) return releases_labels[param:get()] end}
     cs_DUR = cs_DUR:copy()
     cs_DUR.default = 3
-    params:add{type="control", id="duration_max", name="Max", controlspec=cs_DUR, formatter=function(param) return durations_labels[param:get()] end}
-    machine:set_extra_params({'duration_min', 'duration_max'}, {'Min', 'Max'})
+    params:add{type="control", id="release_max", name="Max", controlspec=cs_DUR, formatter=function(param) return releases_labels[param:get()] end}
+    machine:set_extra_params({'release_min', 'release_max'}, {'Min', 'Max'})
 
     -- Probability
     machine = machines['probability']
@@ -228,7 +226,7 @@ function play_next_note()
     local probability = machines['probability']:get_next_value(round_value)
     local should_play = math.random() <= probability
 
-    local release = durations_values[machines['release']:get_next_value(round_index)]
+    local release = releases_values[machines['release']:get_next_value(round_index)]
     if should_play then engine.release(clock:get_beat_sec() * release) end
 
     local velocity = machines['velocity']:get_next_value(round_value) / 127
