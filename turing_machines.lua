@@ -77,7 +77,7 @@ function set_params()
     params:add{type="binary", id="running", name="Running", default=1, behavior='toggle',
         action=function(x) if x == 1 then reset() end end}
 
-    params:add_group('Synth', 4)
+    params:add_group('Synth', 3)
     local cs = controlspec.new(1,#engine_types,'lin',1,1,'')
     params:add{type="control", id="type", name="Type", controlspec=cs,
         formatter=function(param) return engine_types[param:get()] end,
@@ -88,7 +88,6 @@ function set_params()
         action=function(x) engine.attack(durations_values[x]) end}
     cs = controlspec.new(0,1,'lin',0.05,0.5,'')
     params:add{type="control", id="pw", name="Pulse width", controlspec=cs, action=function(x) engine.pw(x) end}
-
 
     params:add_separator("Machines")
 
@@ -198,7 +197,7 @@ end
 function update()
     while true do
         clock.sync(1)
-        if params:get('running') then
+        if params:get('running') == 1 then
             local machine = machines['ratcheting']
             local ratcheting_index
             if machine:get_active() then
