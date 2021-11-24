@@ -1,6 +1,7 @@
 Engine_TuringEngine : CroneEngine {
+    var pg;
     var type = 0;
-	var amp = 0.0;
+	var amp = 0.3;
     var freq = 440;
     var pw = 0.5;
     var cutoff = 500;
@@ -13,6 +14,7 @@ Engine_TuringEngine : CroneEngine {
 	}
 
 	alloc {
+		pg = ParGroup.tail(context.xg);
 		SynthDef("TuringEngine", {
             arg out, freq=freq, pw=pw, cutoff=cutoff, attack=attack, release=release, amp=amp, pan=pan, type=type;
             var osc = Select.ar(type, [Pulse.ar(freq, pw), SinOsc.ar(freq), Saw.ar(freq), LFTri.ar(freq)]);
@@ -27,11 +29,11 @@ Engine_TuringEngine : CroneEngine {
 
         this.addCommand("hz", "f", {|msg|
             var val = msg[1];
-            Synth.new("TuringEngine", [
+            Synth("TuringEngine", [
                 \out,context.out_b,
                 \freq, val, \pw, pw, \cutoff, cutoff, \attack, attack, \release, release, \amp, amp, \pan, pan, \type, type
             ],
-            target:context.xg);
+            target:pg);
         });
 
 		this.addCommand("cutoff", "f", {|msg|
