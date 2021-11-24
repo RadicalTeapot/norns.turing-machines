@@ -6,14 +6,12 @@
 
 -- TODO
 --
--- Add pan machine (and pan control to engine)
---
--- Figure out why engine amp is not working
---
 -- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
 --
 -- Refactor: Add name of extra two params (ones displayed on pages) to machines so the control... and draw...
--- methods can be implemented there and simplify this file
+-- methods can be implemented there and simplify this file (also the code blocks in play_next_note)
+--
+-- Refactor: change all occurences of duration to release
 
 mu = require "musicutil"
 ui = require 'ui'
@@ -54,8 +52,8 @@ function init()
 end
 
 function init_machines()
-    local machine_ids = {"notes", "cutoff", "velocity", "ratcheting", "release", "probability"}
-    local machine_labels = {"Notes", "Cutoff", "Velocity", "Ratcheting", "Release", "Probability"}
+    local machine_ids = {"notes", "cutoff", "velocity", "ratcheting", "release", "probability", "pan"}
+    local machine_labels = {"Notes", "Cutoff", "Velocity", "Ratcheting", "Release", "Probability", "Pan"}
     local previous = nil
     local machine = nil
     for i=1,#machine_ids do
@@ -84,8 +82,6 @@ function set_params()
     params:add{type="control", id="type", name="Type", controlspec=cs,
         formatter=function(param) return engine_types[param:get()] end,
         action=function(x) engine.type(x) end}
-    cs = controlspec.new(0,1,'lin',0.05,0.25,'')
-    params:add{type="control", id="amp", name="Amp", controlspec=cs, action=function(x) engine.amp(x) end}
     cs = controlspec.new(1,#durations_labels,'lin',1,4,'')
     params:add{type="control", id="attack", name="Attack", controlspec=cs,
         formatter=function(param) return durations_labels[param:get()] end,
@@ -175,6 +171,18 @@ function set_params()
     cs_PROB.default = 1
     params:add_control("probability_max", "Max", cs_PROB)
 
+    -- Pan
+    machine = machines['pan']
+    params:add_group(machine.label, 8)
+    local cs_PAN = controlspec.new(-1,1,'lin',0.1,1)
+    machine:add_params(cs_SEQL, cs_KNOB, cs_PAN, cs_CLKDIV)
+    cs_PAN = cs_PAN:copy()
+    cs_PAN.default = -0.25
+    params:add_control("pan_min", "Min", cs_PAN)
+    cs_PAN = cs_PAN:copy()
+    cs_PAN.default = 0.25
+    params:add_control("pan_max", "Max", cs_PAN)
+
     params:default()
     -- Refresh dials of all machines to match default preset
     for _, machine in pairs(machines) do
@@ -252,6 +260,16 @@ function play_next_note()
         cutoff = machine:get_default()
     end
     if should_play then engine.cutoff(cutoff) end
+
+    machine = machines['pan']
+    local cutoff
+    if machine:get_active() then
+        pan = machine:update_sequence_and_get_value()
+        pan = pan * math.abs(params:get("pan_max") - params:get("pan_min")) + math.min(params:get("pan_max"), params:get("pan_min"))
+    else
+        pan = machine:get_default()
+    end
+    if should_play then engine.pan(pan) end
 
     machine = machines['notes']
     local note
@@ -333,6 +351,14 @@ function control_probability_page(index, delta)
     end
 end
 
+function control_pan_page(index, delta)
+    if index==2 then
+        params:delta('pan_min', delta)
+    elseif index==3 then
+        params:delta('pan_max', delta)
+    end
+end
+
 function enc(index, delta)
     if index==1 then
         if delta < 0 and current_machine.previous then
@@ -355,7 +381,8 @@ function enc(index, delta)
             elseif current_machine.id == 'velocity' then control_velocity_page(index, delta)
             elseif current_machine.id == 'ratcheting' then control_ratcheting_page(index, delta)
             elseif current_machine.id == 'release' then control_duration_page(index, delta)
-            elseif current_machine.id == 'probability' then control_probability_page(index, delta) end
+            elseif current_machine.id == 'probability' then control_probability_page(index, delta)
+            elseif current_machine.id == 'pan' then control_pan_page(index, delta) end
         end
     end
 
@@ -463,6 +490,19 @@ function draw_probability_page()
     screen.text(params:string('probability_max'))
 end
 
+function draw_pan_page()
+    screen.level(1)
+    screen.move(0, text_positions.top_label)
+    screen.text('Min')
+    screen.move(0, text_positions.bottom_label)
+    screen.text('Max')
+    if alt then screen.level(15) else screen.level(1) end
+    screen.move(0, text_positions.top_value)
+    screen.text(params:string('pan_min'))
+    screen.move(0, text_positions.bottom_value)
+    screen.text(params:string('pan_max'))
+end
+
 function redraw()
     screen.clear()
     screen.fill()
@@ -478,7 +518,8 @@ function redraw()
     elseif current_machine.id == 'velocity' then draw_velocity_page()
     elseif current_machine.id == 'ratcheting' then draw_ratcheting_page()
     elseif current_machine.id == 'release' then draw_duration_page()
-    elseif current_machine.id == 'probability' then draw_probability_page() end
+    elseif current_machine.id == 'probability' then draw_probability_page()
+    elseif current_machine.id == 'pan' then draw_pan_page() end
 
     current_machine:draw_sequence(60, text_positions.title, 5)
 
