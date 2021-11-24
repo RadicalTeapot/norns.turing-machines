@@ -6,6 +6,7 @@ Engine_TuringEngine : CroneEngine {
     var cutoff = 500;
     var attack = 0.05;
     var release = 1.5;
+    var pan = 0.0;
 
 	*new { arg context, doneCallback;
 		^super.new(context, doneCallback);
@@ -13,11 +14,11 @@ Engine_TuringEngine : CroneEngine {
 
 	alloc {
 		SynthDef("TuringEngine", {
-            arg out, freq=freq, pw=pw, cutoff=cutoff, attack=attack, release=release, amp=amp, type=type;
+            arg out, freq=freq, pw=pw, cutoff=cutoff, attack=attack, release=release, amp=amp, pan=pan, type=type;
             var osc = Select.ar(type, [Pulse.ar(freq, pw), SinOsc.ar(freq), Saw.ar(freq), LFTri.ar(freq)]);
             var filter = MoogFF.ar(osc, cutoff);
             var env = Env.perc(attack, release, amp).kr(2);
-            Out.ar(out, Pan2.ar(filter*env, 0));
+            Out.ar(out, Pan2.ar(filter*env, pan));
 		}).add;
 
         this.addCommand("type", "f", {|msg|
@@ -28,7 +29,7 @@ Engine_TuringEngine : CroneEngine {
             var val = msg[1];
             Synth.new("TuringEngine", [
                 \out,context.out_b,
-                \freq, val, \pw, pw, \cutoff, cutoff, \attack, attack, \release, release, \amp, amp, \type, type
+                \freq, val, \pw, pw, \cutoff, cutoff, \attack, attack, \release, release, \amp, amp, \pan, pan, \type, type
             ],
             target:context.xg);
         });
@@ -51,6 +52,10 @@ Engine_TuringEngine : CroneEngine {
 
 		this.addCommand("amp", "f", {|msg|
 			amp = msg[1];
+		});
+
+		this.addCommand("pan", "f", {|msg|
+			pan = msg[1];
 		});
 	}
 }
