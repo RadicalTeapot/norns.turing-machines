@@ -140,8 +140,8 @@ end
 function Machine:update_sequence_and_get_value()
     local current_value = self:current_value()
     if params:get(self.id..'_running') == 1 then
-        self:mutate_sequence()
         if self.clock_count >= params:get(self.id..'_clock_div') then
+            self:mutate_sequence()
             self:move_to_next_position()
             self.clock_count = 1
         else
