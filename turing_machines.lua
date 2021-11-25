@@ -92,20 +92,23 @@ function set_params()
 
     -- Notes
     local machine = machines['notes']
-    params:add_group(machine.label, 9)
+    params:add_group(machine.label, 10)
     local cs_NOTE = controlspec.MIDINOTE:copy()
     cs_NOTE.default = 48
     cs_NOTE.step = 1
-    local note_formatter = function(param) return mu.note_num_to_name(param:get(), true) end
-    machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_NOTE, note_formatter)
-    params:add{type="control", id="root_note", name="Root note", controlspec=cs_NOTE,
-        formatter=note_formatter, action=function(x) build_scale() end}
+    machine:add_params(cs_SEQL, cs_KNOB, cs_CLKDIV, cs_NOTE, function(param) return mu.note_num_to_name(param:get(), true) end)
+    params:add{type="control", id="root_note", name="Root note", controlspec=controlspec.new(0,11,'lin',1,0),
+        formatter=function(param) return mu.note_num_to_name(param:get(), false) end, action=function(x) build_scale() end}
     params:add{type="number", id="scale", name="Scale", min=1, max=#mu.SCALES, default=1,
-        formatter=function(param) return mu.SCALES[param:get()].name end, action=function(x) build_scale() end}
-    local cs_OCTR = controlspec.new(1,4,'lin',1,2,'')
-    params:add{type="control", id="octave_range", name="Octave range", controlspec=cs_OCTR, formatter=fm.round(1),
-        action=function(x) build_scale() end}
-    machine:set_extra_params({'root_note', 'octave_range'}, {'Root note', 'Oct. Range'})
+        formatter=function(param) return mu.SCALES[param:get()].name end, action=function() build_scale() end}
+    local cs_OCT = controlspec.new(0,8,'lin',1,2,'')
+    params:add{type="control", id="min_oct", name="Min octave", controlspec=cs_OCT, formatter=fm.round(1),
+        action=function() build_scale() end}
+    cs_OCT = cs_OCT:copy()
+    cs_OCT.default = 3
+    params:add{type="control", id="max_oct", name="Max octave", controlspec=cs_OCT, formatter=fm.round(1),
+        action=function() build_scale() end}
+    machine:set_extra_params({'min_oct', 'max_oct'}, {'Min oct.', 'Max oct.'})
 
     -- Cutoff
     machine = machines['cutoff']
@@ -193,8 +196,11 @@ function set_params()
 end
 
 function build_scale()
-    scale_notes = mu.generate_scale(
-        params:get("root_note"), params:get("scale"), params:get("octave_range"))
+    local min = math.min(params:get('min_oct'), params:get('max_oct')) + 1
+    local max = math.max(params:get('min_oct'), params:get('max_oct')) + 1
+    scale_notes = mu.generate_scale(params:get("root_note") + min * 12, params:get("scale"), max - min + 1)
+    -- Remove last note
+    scale_notes[#scale_notes] = nil
 end
 
 function round_value(value, min, max)
@@ -202,11 +208,11 @@ function round_value(value, min, max)
 end
 
 function round_index(index, min, max)
-    return math.floor(index * math.abs(max - min) + math.min(min, max) + 0.5)
+    return math.floor(round_value(index, min, max) + 0.5)
 end
 
-function map_note(note, root_note, oct_range)
-    return math.floor(note * oct_range * 12 + root_note)
+function map_note(note, min_oct, max_oct)
+    return  math.floor(round_value(note, (min_oct+1) * 12, (max_oct+2) * 12))
 end
 
 function update()
