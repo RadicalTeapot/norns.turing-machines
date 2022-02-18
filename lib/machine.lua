@@ -3,41 +3,43 @@ ui = require 'ui'
 local Machine = {}
 Machine.__index = Machine
 
-function Machine.new(id, label, sequence_length)
-    local s = setmetatable({}, Machine)
-    s.id = id or 'machine'
-    s.label = label or id or 'Machine'
+function Machine.new(id, label, max_sequence_length)
+    local self = setmetatable({}, Machine)
+    self.id = id or 'machine'
+    self.label = label or id or 'Machine'
 
-    -- Length of the sequence
-    s.sequence_length = sequence_length or 16
+    -- Max length of the sequence
+    self.max_sequence_length = max_sequence_length or 16
     -- Current step position in sequence array
-    s.position = 1
+    self.position = 1
     -- Link to previous machine in machines list
-    s.previous = nil
+    self.previous = nil
     -- Link to next machine in machines list
-    s.next = nil
+    self.next = nil
     -- Number of ticks since last position update
-    s.clock_count = 1
+    self.clock_count = 1
     -- Table of extra params associated with this machine
-    s.extra_params = {}
+    self.extra_params = {}
 
-    s.dials = {
-        steps=ui.Dial.new(55, 28, 22, 8, 1, s.sequence_length, 1, 1, {s.sequence_length * 0.5}),
+    self.dials = {
+        steps=ui.Dial.new(55, 28, 22, 8, 1, self.max_sequence_length, 1, 1, {self.max_sequence_length * 0.5}),
         knob=ui.Dial.new(100, 28, 22, 50, 0, 100, 1, 50, {50})
     }
 
-    return s
+    return self
 end
 
 function Machine:add_params(sequence_controlspec, knob_controlspec, clock_div_controlspec, default_value_controlspec, default_formatter)
     params:add_binary(self.id.."_active", "Active", "toggle", 1)
-    params:set_action(self.id..'_active', function() self:set_dials_active(params:get(self.id..'_active') == 1) end)
+    params:set_action(self.id..'_active', function()
+        self:set_dials_active(params:get(self.id..'_active') == 1)
+    end)
     params:add_control(self.id.."_steps", "Steps", sequence_controlspec)
     params:add_control(self.id.."_knob", "Knob", knob_controlspec)
     params:add_control(self.id..'_clock_div', "Clock div", clock_div_controlspec)
     params:add_binary(self.id.."_running", "Running", "toggle", 1)
-    params:add{type='control', id=self.id..'_default', name='Default', controlspec=default_value_controlspec,
-        formatter=default_formatter}
+    params:add{type='control', id=self.id..'_default', name='Default',
+        controlspec=default_value_controlspec, formatter=default_formatter}
 
     self.dials.steps:set_value(sequence_controlspec.default)
     self.dials.knob:set_value(get_linexp_value(knob_controlspec.default))
@@ -45,7 +47,7 @@ end
 
 function Machine:add_hidden_params()
     local id
-    for i=1,self.sequence_length do
+    for i=1,self.max_sequence_length do
         id = self.id..'_'..i
         params:add_number(id, '', 0, 1, 0)
         params:hide(id)
@@ -108,7 +110,7 @@ function Machine:step_name(step)
 end
 
 function Machine:init_sequence()
-    for i=1,self.sequence_length do
+    for i=1,self.max_sequence_length do
         params:set(self:step_name(i), math.random())
     end
 end
@@ -214,7 +216,7 @@ function Machine:draw_sequence(x, y, scale)
     local index = self.position
     local steps = self:get_steps()
     local max_level = 15
-    if not self.active then max_level = 7 end
+    if not self:get_active() then max_level = 7 end
     for i=0,math.min(steps - 1, 7) do
         index = util.wrap(self.position + i, 1, steps)
         screen.level(math.floor(self:value_at(index) * max_level + 1))
@@ -248,7 +250,7 @@ end
 function Machine:draw_title(x, y)
     screen.level(1)
     screen.move(x, y)
-    screen.text(string.upper(current_machine.label))
+    screen.text(string.upper(self.label))
 end
 
 function Machine:set_dials_active(state)
