@@ -7,6 +7,7 @@
 -- TODO
 --
 -- Add midi and output control (similar to awake) and settings to map each machine that makes sense to a midi cc
+-- Remove require for already imported libraries (i.e. util, see here https://monome.org/docs/norns/reference/#system-globals)
 
 mu = require "musicutil"
 ui = require 'ui'
